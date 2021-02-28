@@ -3,6 +3,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import silhouette_samples, silhouette_score
+import scikitplot as skplot
 #load data
 df = pd.read_csv("insurance.csv")
 #check data structure and missing data
@@ -71,3 +76,76 @@ ax = sns.barplot(charges, charges.index, palette="Blues")
 plt.title("Charges by Region")
 plt.show()
 
+#modelling 
+df["weight_condition"] = np.nan
+lst = [df]
+
+for col in lst:
+    col.loc[col["bmi"] < 18.5, "weight_condition"] = "Underweight"
+    col.loc[(col["bmi"] >= 18.5) & (col["bmi"] < 24.986), "weight_condition"] = "Normal Weight"
+    col.loc[(col["bmi"] >= 25) & (col["bmi"] < 29.926), "weight_condition"] = "Overweight"
+    col.loc[col["bmi"] >= 30, "weight_condition"] = "Obese"
+    
+
+# Two subplots one with weight condition and the other with smoker.
+
+f, (ax1, ax2) = plt.subplots(ncols=2, figsize=(18,8))
+sns.scatterplot(x="bmi", y="charges", hue="weight_condition", data=df, palette="Set1", ax=ax1)
+ax1.set_title("Relationship between Charges and BMI by Weight Condition")
+
+sns.scatterplot(x="bmi", y="charges", hue="smoker", data=df, palette="Set1", ax=ax2)
+ax2.set_title("Relationship between Charges and BMI by Smoking Condition")
+
+plt.show()
+
+#Kmeans model 
+X = df[["bmi", "charges"]]
+sc = StandardScaler()
+xs = sc.fit_transform(X)
+X = pd.DataFrame(xs, index=X.index, columns=X.columns)
+
+X.describe().T
+
+KS = range(2, 6)
+
+# storage
+inertia = []
+silo = []
+
+for k in KS:
+  km = KMeans(k)
+  km.fit(X)
+  labs = km.predict(X)
+  inertia.append(km.inertia_)
+  silo.append(silhouette_score(X, labs))
+
+plt.figure(figsize=(15,5))
+
+
+plt.subplot(1, 2, 1)
+plt.title("Inertia")
+sns.lineplot(KS, inertia)
+
+plt.subplot(1, 2, 2)
+plt.title("Silohouette Score")
+sns.lineplot(KS, silo)
+
+plt.show()
+
+k3 = KMeans(3)
+k3_labs = k3.fit_predict(X)
+
+# metrics
+k3_silo = silhouette_score(X, k3_labs)
+k3_ssamps = silhouette_samples(X, k3_labs)
+np.unique(k3_labs)
+
+skplot.metrics.plot_silhouette(X, k3_labs, title="KMeans - 3", figsize=(15,5))
+plt.show()
+
+fig = plt.figure(figsize=(12,8))
+
+plt.scatter(X.values[:,0], X.values[:,1], c=k3.labels_, cmap="Set1_r", s=25)
+plt.scatter(k3.cluster_centers_[:,0] ,k3.cluster_centers_[:,1], color='black', marker="x", s=250)
+plt.title("Kmeans Clustering \n Finding Unknown Groups in the Population", fontsize=16)
+plt.show()
